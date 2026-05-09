@@ -1,0 +1,10 @@
+{
+  "projectId": "wooai-pro",
+  "appId": "1:813853480571:web:031c750bae0eb75d1774de",
+  "apiKey": "AIzaSyDqDYKdsyriJJ18oyRcU_1kxPMthGAOhhA",
+  "authDomain": "wooai-pro.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "wooai-pro.firebasestorage.app",
+  "messagingSenderId": "813853480571",
+  "measurementId": ""
+}

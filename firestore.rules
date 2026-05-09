@@ -1,0 +1,86 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isAdmin() { 
+      return isSignedIn() && request.auth.token.email == 'zohrabenmiled@gmail.com';
+    }
+    function isVerifiedAdmin() {
+      return isAdmin() && request.auth.token.email_verified == true;
+    }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    
+    function isValidSite(data) {
+      return data.userId == request.auth.uid
+        && data.url is string && data.url.size() <= 512
+        && data.consumerKeyEnc is string
+        && data.consumerSecretEnc is string;
+    }
+
+    function isValidSyncData(data) {
+       return (data.get('products', []) is list)
+         && (data.get('posts', []) is list)
+         && (data.get('lastSync', '') is string);
+    }
+
+    // User Profiles
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) 
+        && request.resource.data.keys().hasAll(['email', 'packType', 'expirationDate'])
+        && request.resource.data.packType in ['free', 'solo', 'business', 'agency'];
+      allow update: if (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['packType', 'expirationDate']))
+        || isVerifiedAdmin();
+    }
+
+    // Sites
+    match /sites/{siteId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() 
+        && isValidSite(request.resource.data)
+        && request.resource.data.keys().hasAll(['userId', 'url', 'consumerKeyEnc', 'consumerSecretEnc']);
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // Site Uniqueness Registry
+    match /registered_sites/{regId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() 
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.url is string;
+      allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    // Subscriptions
+    match /subscriptions/{subId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+    }
+
+    // System Settings
+    match /settings/config {
+      allow read: if isSignedIn();
+      allow write: if isVerifiedAdmin();
+    }
+
+    // Admin Settings
+    match /admin/{settingId} {
+      allow read: if true; // Publicly readable for landing page pricing
+      allow write: if isVerifiedAdmin();
+    }
+
+    // Competitors
+    match /competitors/{compId} {
+      allow read: if isSignedIn(); // Simplified for now
+      allow write: if false; // System only writes (mocked in backend proxy usually)
+    }
+  }
+}
